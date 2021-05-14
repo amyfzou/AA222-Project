@@ -1,0 +1,30 @@
+WELSPECS
+--WELL SPECIFICATION 
+--WELLNAME GROUP  I-COORD  J-COORD  BHPREFDEPTH PHASE
+  'PWELL01' 'G1'   5  5        1250       'OIL' /
+  'PWELL02' 'G1'   38  5        1250       'OIL' /
+  'PWELL03' 'G1'   21  21        1250       'OIL' /
+  'PWELL04' 'G1'   5  38        1250       'OIL' /
+  'PWELL05' 'G1'   38  38        1250       'OIL' /
+/
+
+COMPDAT  
+-- properties of well completion  
+-- Wellname    i   j   z-up  Z-down  Flag   RelPermTab  Transfac       WellDiam   		
+   'PWELL01'   5  5   1    1  'OPEN'  1*   1*    0.10   3*  'Z'  /
+   'PWELL02'   38  5   1    1  'OPEN'  1*   1*    0.10   3*  'Z'  /
+   'PWELL03'   21  21   1    1  'OPEN'  1*   1*    0.10   3*  'Z'  /
+   'PWELL04'   5  38   1    1  'OPEN'  1*   1*    0.10   3*  'Z'  /
+   'PWELL05'   38  38   1    1  'OPEN'  1*   1*    0.10   3*  'Z'  /
+/
+
+
+WCONPROD    
+-- control for production wells  
+-- Wellname   Flag   ContrMode  O-target  w-rate    g-rate    liq-rate  rf_rate  BHP_target     
+  'PWELL01'  'OPEN'  'ORAT'      2500  1*        1*        1*        1*       2000    /
+  'PWELL02'  'OPEN'  'ORAT'      2500  1*        1*        1*        1*       2000    /  
+  'PWELL03'  'OPEN'  'ORAT'      2500  1*        1*        1*        1*       2000    /  
+  'PWELL04'  'OPEN'  'ORAT'      2500  1*        1*        1*        1*       2000    /  
+  'PWELL05'  'OPEN'  'ORAT'      2500  1*        1*        1*        1*       2000    /    
+/

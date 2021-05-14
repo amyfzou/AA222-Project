@@ -1,0 +1,220 @@
+--========================================================================
+-- AA222 Final Project Eclipse File
+-- ========================================================================
+
+RUNSPEC
+NOECHO
+TITLE
+AA222 Final Project
+
+DIMENS
+-- Number of grid blocks
+-- Nx Ny Nz
+  42 42  1 /
+
+-- Phases present in the model 
+
+OIL 
+
+GAS
+
+DISGAS 
+
+BLACKOIL
+
+--Units used 
+FIELD 
+
+TABDIMS
+-- Saturation and PVT Tables		
+-- NumSatTab  NumPVTTab  MaxNodesSatTab  MaxNodePVTTab   MaxFIPReg  MaxRNodePVTTab   
+   2         2         22              22                1          30 /
+
+WELLDIMS
+-- MaxNumWells  MaxConectGridBlWell  MaxNumGroups  MaxNumWellGroup
+   10           70                      1                   10   /
+
+
+START
+   1 'Jan' 2021  /
+
+--==================================================================
+GRID      == geometry of our model
+NOECHO 
+EQUALS    -- set top depth, block sizes and rock properties
+          -- valid for a given range of blocks: I1 I2   J1 J2   K1 K2   
+
+      'DX'     100   /                        -- default box => all blocks
+      'DY'     50   / 
+      'PORO'   0.25  / 
+      'DZ'     100  / -- thickness of the layers
+      'TOPS'   1200 1 42  1  42 1 1 /
+      'PERMZ'  100 /
+/
+
+INCLUDE
+'.\PERMX.IN'  -- permeability file
+/
+COPY
+PERMX PERMY/  -- permy := permx
+/
+
+
+--==================================================================
+INIT
+
+GRIDFILE
+-- control amount of data in geometry file
+  2 /
+
+--==================================================================
+PROPS
+NOECHO
+
+--  PRESSURE    RS       BO      VISO      CO     VISOSIBILITY
+--  [psia] [mscf/stb] [rb/stb]  [cp]   [1/psia]    [1/psia]
+PVCO
+ 0	    0		    0.99875128	2	1.00E-05	0
+14.7	0.033073119	1		    2	1.00E-05	0
+100	    0.363352777	1.007276849	2	1.00E-05	0
+1000	6.461427614	1.087357564	2	1.00E-05	0
+1250	8.540159849	1.110711166	2	1.00E-05	0
+1500	10.72611767	1.134566342	2	1.00E-05	0
+1750	13.00546978	1.158933864	2	1.00E-05	0
+2000	15.36795138	1.183824738	2	1.00E-05	0
+2250	17.80560075	1.209250202	2	1.00E-05	0
+2500	20.31203771	1.235221739	2	1.00E-05	0
+2750	22.88201946	1.261751077	2	1.00E-05	0
+3000	25.51115091	1.288850196	2	1.00E-05	0
+3250	28.19568724	1.316531333	2	1.00E-05	0
+3500	30.93239439	1.344806989	2	1.00E-05	0
+3750	33.71844733	1.373689932	2	1.00E-05	0
+4000	36.55135425	1.403193205	2	1.00E-05	0
+4250	39.42889862	1.433330131	2	1.00E-05	0
+4500	42.34909419	1.46411432	2	1.00E-05	0
+4750	45.31014953	1.495559673	2	1.00E-05	0
+5000	48.31043953	1.52768039	2	1.00E-05	0/
+/
+
+PVDG
+-- PRESSURE    BG       VISG 
+-- [psia]    [rb/mscf]  [cp]      
+0	    182.190	0.0133
+14.7	178.110	0.0133
+100	    156.177	0.0134
+1000	39.035	0.0146
+1250	26.557	0.015
+1500	18.068	0.0155
+1750	12.293	0.016
+2000	8.363	0.0165
+2250	5.690	0.0171
+2500	3.871	0.0177
+2750	2.634	0.0183
+3000	1.792	0.019
+3250	1.219	0.0197
+3500	0.829	0.0205
+3750	0.564	0.0213
+4000	0.384	0.0221
+4250	0.261	0.023
+4500	0.178	0.0239
+4750	0.121	0.0248
+5000	0.082	0.0258/
+/
+
+SGOF
+--Sg   		Krg   		Kro   		Pcog
+0		0		         1		    0
+0.05	0.0025		0.925945463		0
+0.1		0.01		0.853814968		0
+0.15	0.0225		0.783661279		0
+0.2		0.04		0.715541753		0
+0.25	0.0625		0.649519053		0
+0.3		0.09		0.585662019		0
+0.35	0.1225		0.524046754		0
+0.4		0.16		0.464758002		0
+0.45	0.2025		0.407890917		0
+0.5		0.25		0.353553391		0
+0.55	0.3025		0.301869177		0
+0.6		0.36		0.252982213		0
+0.65	0.4225		0.207062792		0
+0.7		0.49		0.164316767		0
+0.75	0.5625		0.125		    0
+0.8		0.64		0.089442719		0
+0.85	0.7225		0.05809475		0
+0.9		0.81		0.031622777		0
+0.95	0.9025		0.01118034		0
+1		1		    0		        0/
+/
+ROCK
+ 3600  0.0/ 
+/
+DENSITY 
+-- lbm/ft3 
+49.15  63.024 0.06055 /
+/
+
+PMAX 
+70000 /
+
+--==================================================================
+SOLUTION 
+NOECHO
+PRESSURE 
+1764*7000 /  -- initial pressure
+
+PBUB 
+1764*3000 /  -- bubble point pressure
+
+SGAS
+1764*0.0 /   -- initial gas saturation
+
+RPTSOL
+'RESTART=2' /
+
+--==================================================================
+SUMMARY  
+
+RUNSUM
+SEPARATE
+--WBHP       -- bottom hole pressure of specified wells
+-- 'PWELL01'
+--/
+
+FGPR     -- gas production rate
+FOPR     -- oil production rate
+FGOR     -- gas oil ratio
+FGPT     -- cumulative gas production
+FOPT     -- cumulative oil production
+FPR      -- average pressure
+FOE      -- oil recovery factor
+
+--BPR      -- block pressure for the specified gridblock
+--21 21 1 /
+/
+
+--==================================================================
+SCHEDULE 
+NOECHO
+--RPTSCHED   -- CONTROLS ON OUTPUT AT EACH REPORT TIME
+--  'WELLS=2' 'WELSPECS'
+--RESTART=1
+--/
+
+--RPTRST
+--'BASIC=2'
+--/
+
+TUNING  -- min/max timestep (3 sections)
+0.1 10 /
+5*  0.1 /
+2* 60 /
+
+INCLUDE
+'base.sched'
+/
+
+TSTEP       -- report times
+100*36.5/  
+
+--==================================================================
+END
