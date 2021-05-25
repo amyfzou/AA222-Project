@@ -12,7 +12,7 @@ cmd='eclrun eclipse AA222.data' # This is the cmd command to run eclipse
 fname='AA222.RSM' # This file contains the output of the eclipse run e.g., time, production rate, etc.
 DETACHED_PROCESS = 0x00000008 # Don't worry about this guy
 
-N=2 # number of particles aka number of function evaluations per iteration
+N=1 # number of particles aka number of function evaluations per iteration
 oil_price = 60 # $/stb
 gas_cost = 5.3E-3 # $/MSCF
 discount_rate = 0.1 # Annual discount rate
