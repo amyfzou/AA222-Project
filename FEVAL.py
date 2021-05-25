@@ -17,7 +17,7 @@ oil_price = 60 # $/stb
 gas_cost = 5.3E-3 # $/MSCF
 discount_rate = 0.1 # Annual discount rate
 
-NPV_outfile='NPVs.txt' # This is where the NPV output for all particles will be stored at currently
+NPV_outfile='NPV.txt' # This is where the NPV output for all particles will be stored at currently
 f= open(NPV_outfile,"w+")
 f.close()
 
