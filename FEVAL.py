@@ -12,7 +12,6 @@ cmd='eclrun eclipse AA222.data' # This is the cmd command to run eclipse
 fname='AA222.RSM' # This file contains the output of the eclipse run e.g., time, production rate, etc.
 DETACHED_PROCESS = 0x00000008 # Don't worry about this guy
 
-N=1 # number of particles aka number of function evaluations per iteration
 oil_price = 60 # $/stb
 gas_cost = 5.3E-3 # $/MSCF
 discount_rate = 0.1 # Annual discount rate
@@ -21,8 +20,8 @@ NPV_outfile='NPV.txt' # This is where the NPV output for all particles will be s
 f= open(NPV_outfile,"w+")
 f.close()
 
-# Run Eclipse N number of times per iteration and evaluate N NPVs
-for n in range(N):
+# Run Eclipse 1 time
+for n in range(1):
     os.chdir(ECL_path)
     subprocess.call(cmd, creationflags=DETACHED_PROCESS) # Run Eclipse - ECLRUN console will open and will close automatically - it's kinda annoying but will worry about getting rid of it later
     data = np.loadtxt(fname,skiprows=10)
@@ -40,7 +39,7 @@ for n in range(N):
     # Currently I am printing NPV out in a file called 'NPVs.txt', this file is at the same location as this .py script
     # This file will capture the NPV values for all particles (in this current example 2 particles as N=2)
     # The first column is the particle index and the second column is the corresponding NPV value for that particle in this iteration. The two values are separated by a comma 
-    os.chdir('..')
+    # os.chdir('..')
     try:        
         output = open(NPV_outfile, 'a')
         output.write(str(n+1)+','+str(NPV)+'\n')
