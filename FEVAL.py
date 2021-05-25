@@ -36,13 +36,12 @@ for n in range(1):
         time_factor = (time[i+1]-time[i])/np.power((1+discount_rate),(time[i+1]/365)) # This is the time multiplier between time tn-1 and tn
         NPV += time_factor * profit # Compute NPV and the final NPV will be the output
 
-    # Currently I am printing NPV out in a file called 'NPVs.txt', this file is at the same location as this .py script
-    # This file will capture the NPV values for all particles (in this current example 2 particles as N=2)
-    # The first column is the particle index and the second column is the corresponding NPV value for that particle in this iteration. The two values are separated by a comma 
+    # Currently I am printing NPV out in a file called 'NPV.txt', this file will be generated inside each Eclipse folder
+    # This file will capture the NPV values for the current particle
     # os.chdir('..')
     try:        
         output = open(NPV_outfile, 'a')
-        output.write(str(n+1)+','+str(NPV)+'\n')
+        output.write(str(NPV)+'\n')
         output.close()
     except:
         print("Unable to append to " + NPV_outfile)
