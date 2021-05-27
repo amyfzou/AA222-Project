@@ -1,45 +1,53 @@
 using LinearAlgebra
+#using Pkg
+#Pkg.add("Distributions")
 using Distributions
+#Pkg.add("Combinatorics")
+import Combinatorics: combinations #combinations(a,n): returns all combinations of n elements of indexable object a;
 
-include("helpers.jl")
-include("simple.jl")
 
-#include("cmaes.jl")
+include("configure_sched_file.jl")
 
-function penalty_funtion(choice)
-	fun = if choice == "quadratic"
-		function pquadratic(x, c)
-			return sum(max.(c(x),0).^2)
-		end
-	elseif choice == "count"
-		function pcount(x, c)
-			return sum(sum([c(x) .> 0])) #gives the total number of constraint violations
-		end
-	end
-	return fun
+#ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python")
+
+function constraints(x::Vector; Nx = 42, Ny = 42, distance_limit = 2)
+	c1 = [-l+1 for l in x]
+	c2 = [l-Nx*Ny for l in x]
+	c3 = [-distance(ls[1], ls[2])+distance_limit for ls in collect(combinations(x,2))]
+	return [c1; c2; c3]
 end
 
-function ∇penalty_funtion(choice)
-	fun = if choice == "quadratic"
-		function ∇pquadratic(x, c)
-			#TO BE IMPLEMENTED
-			println("TO BE IMPLEMENTED")
-			return 0
-		end
-	elseif choice == "count"
-		function ∇pcount(x, c)
-			return 0
-		end
-	end
-	return fun
+function get_l(i, j; Nx = 42, Ny = 42)
+	return l = floor(Int,(j-1)*Nx + i)
 end
 
-function covariance_matrix_adaptation(f, x, k_max;σ = 1.0)
-	x_history = x
+function get_coordinate(l::Int; Nx = 42)
+	j = floor(Int, l/Nx)
+	i = l - j*Nx
+	return [i, j]
+end
+
+function distance(l1::Int,l2::Int)
+	vec1 = get_coordinate(l1)
+	vec2 = get_coordinate(l2)
+	return norm(vec1-vec2)
+end
+
+function covariance_matrix_adaptation(c, k_max; σ = 10.0, penalty_choice = "quadratic")
+	directory = pwd()
+
+	#Read initial wells' coordinates from SCHED file that is placed in the same directory as the current code
+	well_dict = read_sched_file("base.SCHED", directory)
+	global wells_name =  [i for i in keys(well_dict)]
+
+	#Temporary solution before the decoder is implemented:
+	#Sample just the x coordinate of each well (2D reservoir)
+	x = [get_l(i[2][1],i[2][2]) for i in well_dict]
+	x_history = x #initialize vector x_history
 
 	m = 4 + floor(Int, 3*log(length(x)))
 	m_elite = div(m,2)
-	μ, n = copy(x), length(x)
+	μ, n = copy(x), length(x) #n is the number of wells
 	ws = log((m+1)/2) .- log.(1:m)
 	ws[1:m_elite] ./= sum(ws[1:m_elite])
 	μ_eff = 1 / sum(ws[1:m_elite].^2)
@@ -51,10 +59,50 @@ function covariance_matrix_adaptation(f, x, k_max;σ = 1.0)
 	ws[m_elite+1:end] .*= -(1 + c1/cμ)/sum(ws[m_elite+1:end])
 	E = n^0.5*(1-1/(4n)+1/(21*n^2))
 	pσ, pΣ, Σ = zeros(n), zeros(n), Matrix(1.0I, n, n)
+
+	#Create m folders inside current directory
+	for i = 1:m
+		rm(string(i), force = true, recursive=true) #delete folder if it exists
+		mkdir(string(i))
+		mkpath(string(i) * "\\AA222_EclipseFile")
+		file_directory = directory * "\\" * string(i)
+		#Copy the folder "A222_EclipseFile" and the file "FEVAL.py" to each folder
+		#Couldn't find a function that copies and pastes the entire folder.... So I'm doing it file by file
+		cp(directory * "\\AA222_EclipseFile\\AA222.data", file_directory * "\\AA222_EclipseFile\\AA222.data", force = true)
+		cp(directory * "\\AA222_EclipseFile\\base.sched", file_directory * "\\AA222_EclipseFile\\base.sched", force = true)
+		cp(directory * "\\AA222_EclipseFile\\PERMX.IN", file_directory * "\\AA222_EclipseFile\\PERMX.IN", force = true)
+		cp(directory * "\\FEVAL.py", file_directory  * "\\FEVAL.py", force = true)
+	end
+
+	NPV = zeros(m) #initialize vector
+
 	for k in 1 : k_max
 		P = MvNormal(μ, σ^2*Σ)
 		xs = [rand(P) for i in 1 : m]
-		ys = [f(x) for x in xs]
+
+		#Configure each SHED file with new wells coordinates and place it in its respective folder
+		#And call the Python script that runs ECLIPSE simulator inside each individual folder
+		#And read the NPV.text file inside each folder and store the values in the NPV variable
+
+		for i_individual = 1:m
+			#From x variable build well_dict:
+			for i_well in keys(well_dict)
+				i_well_index = findfirst((x -> x==i_well), wells_name)
+				i,j = get_coordinate(convert(Int, round(xs[i_individual][i_well_index], digits=0)))
+				well_dict[i_well][1:2] = [i,j] #change only the x and y positions on this test case
+			end
+			file_directory = directory * "\\" * string(i_individual) * "\\" * "AA222_EclipseFile"
+			write_sched_file("base.sched", well_dict, file_directory)
+
+			cd(pythondirectory)
+			mycommand = `python FEVAL.py`
+ 			run(mycommand)
+			cd(directory)
+
+			NPV[i_individual] = parse(Float64, open(f->read(f, String), directory * "\\" * string(i_individual) * "\\AA222_EclipseFile\\NPV.txt"))
+		end
+
+		ys = NPV .+  [sum(max.(c(convert.(Int, round.(x))),0).^2) for x in xs] #Quadratic penalty function
 		is = sortperm(ys) # best to worst
 		# selection and mean update
 		δs = [(x - μ)/σ for x in xs]
@@ -73,13 +121,15 @@ function covariance_matrix_adaptation(f, x, k_max;σ = 1.0)
 		cμ*sum(w0[i]*δs[is[i]]*δs[is[i]]' for i in 1 : m)
 		Σ = triu(Σ)+triu(Σ,1)' # enforce symmetry
 
-		x_history = [x_history μ]
+		x_history = [x_history convert.(Int, round.(μ))]
+
 	end
 	return x_history
 end
 
-function optimize(f, ∇f, x0, n_max, prob)
-	return x_history = covariance_matrix_adaptation(f, x0, n_max;σ = 1.0)
+function optimize(c, k_max)
+	return x_history = covariance_matrix_adaptation(c, k_max; σ = 1.0, penalty_choice = "quadratic")
 end
 
-x_history = optimize(rosenbrock, rosenbrock_gradient, rosenbrock_init(), 20, "simple1")
+cd(dirname(@__FILE__)) #change location to current directory
+x_history = optimize(constraints, 10)
