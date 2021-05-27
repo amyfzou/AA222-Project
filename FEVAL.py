@@ -17,8 +17,6 @@ gas_cost = 5.3E-3 # $/MSCF
 discount_rate = 0.1 # Annual discount rate
 
 NPV_outfile='NPV.txt' # This is where the NPV output for all particles will be stored at currently
-f= open(NPV_outfile,"w+")
-f.close()
 
 # Run Eclipse 1 time
 for n in range(1):
@@ -39,10 +37,11 @@ for n in range(1):
     # Currently I am printing NPV out in a file called 'NPV.txt', this file will be generated inside each Eclipse folder
     # This file will capture the NPV values for the current particle
     # os.chdir('..')
+    f= open(NPV_outfile,"w+")
+    f.close()
     try:        
-        output = open(NPV_outfile, 'a')
+        output = open(NPV_outfile, 'w')
         output.write(str(NPV)+'\n')
         output.close()
     except:
         print("Unable to append to " + NPV_outfile)
-
