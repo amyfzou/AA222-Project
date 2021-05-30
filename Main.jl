@@ -4,11 +4,10 @@ using LinearAlgebra
 using Distributions
 #Pkg.add("Combinatorics")
 import Combinatorics: combinations #combinations(a,n): returns all combinations of n elements of indexable object a;
-
+#Pkg.add("JLD")
+using JLD
 
 include("configure_sched_file.jl")
-
-#ENV["PYCALL_JL_RUNTIME_PYTHON"] = Sys.which("python")
 
 function constraints(x::Vector; Nx = 42, Ny = 42, distance_limit = 2)
 	c1 = [-l+1 for l in x]
@@ -22,8 +21,8 @@ function get_l(i, j; Nx = 42, Ny = 42)
 end
 
 function get_coordinate(l::Int; Nx = 42)
-	j = floor(Int, l/Nx)
-	i = l - j*Nx
+	j = ceil(Int, l/Nx)
+	i = l - (j-1)*Nx
 	return [i, j]
 end
 
@@ -33,7 +32,18 @@ function distance(l1::Int,l2::Int)
 	return norm(vec1-vec2)
 end
 
-function covariance_matrix_adaptation(c, k_max; σ = 10.0, penalty_choice = "quadratic")
+function wells_inside_domain(well_dict::Dict, x, c)
+	N = length(well_dict) #number of wells
+	c_value = c(convert.(Int, round.(x)))
+	println(c_value[1:2*N])
+	if sum(c_value[1:2*N].>= 0) == 0 #then there are no boundary constraints violations
+		return true		
+	else #if an element is >0 then there's a well outside the reservoir boundary and Eclipse won't run
+		return 	false
+	end
+end
+
+function covariance_matrix_adaptation(c, k_max; σ = 100.0)
 	directory = pwd()
 
 	#Read initial wells' coordinates from SCHED file that is placed in the same directory as the current code
@@ -75,8 +85,12 @@ function covariance_matrix_adaptation(c, k_max; σ = 10.0, penalty_choice = "qua
 	end
 
 	NPV = zeros(m) #initialize vector
+	ρ = 1e6 #initialize penalty factor
+	γρ = 1.1
 
 	for k in 1 : k_max
+		println(k)
+		
 		P = MvNormal(μ, σ^2*Σ)
 		xs = [rand(P) for i in 1 : m]
 
@@ -85,24 +99,34 @@ function covariance_matrix_adaptation(c, k_max; σ = 10.0, penalty_choice = "qua
 		#And read the NPV.text file inside each folder and store the values in the NPV variable
 
 		for i_individual = 1:m
-			#From x variable build well_dict:
-			for i_well in keys(well_dict)
-				i_well_index = findfirst((x -> x==i_well), wells_name)
-				i,j = get_coordinate(convert(Int, round(xs[i_individual][i_well_index], digits=0)))
-				well_dict[i_well][1:2] = [i,j] #change only the x and y positions on this test case
+			println(xs[i_individual])
+			println(wells_inside_domain(well_dict, xs[i_individual], c))
+			if wells_inside_domain(well_dict, xs[i_individual], c) == true
+				#From x variable build well_dict:
+				for i_well in keys(well_dict)
+					i_well_index = findfirst((x -> x==i_well), wells_name)
+					i,j = get_coordinate(convert(Int, round(xs[i_individual][i_well_index], digits=0)))
+					well_dict[i_well][1:2] = [i,j] #change only the x and y positions on this test case
+				end
+				file_directory = directory * "\\" * string(i_individual) * "\\" * "AA222_EclipseFile"
+				write_sched_file("base.sched", well_dict, file_directory)
+
+				pythondirectory = directory * "\\" * string(i_individual)
+				cd(pythondirectory)
+				mycommand = `python FEVAL.py`
+				run(mycommand)
+				cd(directory)
+				
+				aux = open(f->read(f, String), directory * "\\" * string(i_individual) * "\\AA222_EclipseFile\\NPV.txt")
+				NPV[i_individual] = parse(Float64, aux)
+			else #then the boundary constraints are violated
+				NPV[i_individual] = 0
 			end
-			file_directory = directory * "\\" * string(i_individual) * "\\" * "AA222_EclipseFile"
-			write_sched_file("base.sched", well_dict, file_directory)
-
-			cd(pythondirectory)
-			mycommand = `python FEVAL.py`
- 			run(mycommand)
-			cd(directory)
-
-			NPV[i_individual] = parse(Float64, open(f->read(f, String), directory * "\\" * string(i_individual) * "\\AA222_EclipseFile\\NPV.txt"))
 		end
+		println(NPV)
+		println(ρ .* [sum(max.(c(convert.(Int, round.(x))),0).^2) for x in xs])
 
-		ys = NPV .+  [sum(max.(c(convert.(Int, round.(x))),0).^2) for x in xs] #Quadratic penalty function
+		ys = -NPV .+ ρ .* [sum(max.(c(convert.(Int, round.(x))),0).^2) for x in xs] #Quadratic penalty function
 		is = sortperm(ys) # best to worst
 		# selection and mean update
 		δs = [(x - μ)/σ for x in xs]
@@ -123,13 +147,41 @@ function covariance_matrix_adaptation(c, k_max; σ = 10.0, penalty_choice = "qua
 
 		x_history = [x_history convert.(Int, round.(μ))]
 
+		ρ *= γρ #update penalty
+
 	end
 	return x_history
 end
 
 function optimize(c, k_max)
-	return x_history = covariance_matrix_adaptation(c, k_max; σ = 1.0, penalty_choice = "quadratic")
+	return x_history = covariance_matrix_adaptation(c, k_max; σ = 5)
 end
 
 cd(dirname(@__FILE__)) #change location to current directory
 x_history = optimize(constraints, 10)
+save("x_history.jld", "x_history", x_history)
+#=
+x_optimal = x_history[:,end]
+cd(dirname(@__FILE__)) #change location to current directory
+directory = pwd()
+well_dict = read_sched_file("base.SCHED", directory)
+wells_name =  [i for i in keys(well_dict)]
+for i_well in keys(well_dict)
+	i_well_index = findfirst((x -> x==i_well), wells_name)
+	i,j = get_coordinate(convert(Int, round(x_optimal[i_well_index], digits=0)))
+	well_dict[i_well][1:2] = [i,j] #change only the x and y positions on this test case
+end
+
+println(well_dict)
+
+file_directory = directory * "\\" * "AA222_EclipseFile"
+write_sched_file("base.sched", well_dict, file_directory)
+
+cd(directory)
+mycommand = `python FEVAL.py`
+run(mycommand)
+
+			
+aux = open(f->read(f, String), directory * "\\AA222_EclipseFile\\NPV.txt")
+NPV_optimal = parse(Float64, aux)
+=#
