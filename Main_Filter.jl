@@ -9,7 +9,7 @@ using JLD
 
 include("configure_sched_file.jl")
 
-function constraints(x::Vector; Nx = 42, Ny = 42, distance_limit = 2)
+function constraints(x::Vector; Nx = 42, Ny = 42, distance_limit = 20)
 	c1 = [-l+1 for l in x]
 	c2 = [l-Nx*Ny for l in x]
 	c3 = [-distance(ls[1], ls[2])+distance_limit for ls in collect(combinations(x,2))]
@@ -42,7 +42,7 @@ function wells_inside_domain(well_dict::Dict, x, c)
 	end
 end
 
-function covariance_matrix_adaptation(c, k_max; σ = 100.0)
+function covariance_matrix_adaptation(c, k_max, σ)
 	directory = pwd()
 
 	#Read initial wells' coordinates from SCHED file that is placed in the same directory as the current code
@@ -53,6 +53,7 @@ function covariance_matrix_adaptation(c, k_max; σ = 100.0)
 	#Sample just the x coordinate of each well (2D reservoir)
 	x = [get_l(i[2][1],i[2][2]) for i in well_dict]
 	x_history = x #initialize vector x_history
+    ys_history = [] #initialize variable
 
 	m = 4 + floor(Int, 3*log(length(x)))
 	m_elite = div(m,2)
@@ -96,8 +97,8 @@ function covariance_matrix_adaptation(c, k_max; σ = 100.0)
 		#And read the NPV.text file inside each folder and store the values in the NPV variable
 
 		for i_individual = 1:m
-			println("xs[i_individual] = $(xs[i_individual])")
-			println("wells_inside_domain? $(wells_inside_domain(well_dict, xs[i_individual], c))")
+			#println("xs[i_individual] = $(xs[i_individual])")
+			#println("wells_inside_domain? $(wells_inside_domain(well_dict, xs[i_individual], c))")
 
 			if wells_inside_domain(well_dict, xs[i_individual], c) == true
 				#From x variable build well_dict:
@@ -124,9 +125,9 @@ function covariance_matrix_adaptation(c, k_max; σ = 100.0)
 
         constraint = [sum(max.(c(convert.(Int, round.(x))),0).^2) for x in xs] #Quadratic penalty function
 		ys = [(constraint[i],-NPV[i],i) for i in 1:m]
-        println("ys = $ys")
+        #println("ys = $ys")
 		is = sortperm(ys, by = x->(x[1],x[2])) # best to worst
-        println("is = $is")
+        #println("is = $is")
 
 		# selection and mean update
 		δs = [(x - μ)/σ for x in xs]
@@ -146,40 +147,21 @@ function covariance_matrix_adaptation(c, k_max; σ = 100.0)
 		Σ = triu(Σ)+triu(Σ,1)' # enforce symmetry
 
 		x_history = [x_history convert.(Int, round.(μ))]
+        push!(ys_history, ys)
 
 	end
-	return x_history
+	return x_history, ys_history
 end
 
-function optimize(c, k_max)
-	return x_history = covariance_matrix_adaptation(c, k_max; σ = 50)
+function optimize(c, k_max, σ)
+	return (x_history, ys_history) = covariance_matrix_adaptation(c, k_max, σ)
 end
 
-cd(dirname(@__FILE__)) #change location to current directory
-x_history = optimize(constraints, 100)
-save("x_history_filter.jld", "x_history", x_history)
-#=
-x_optimal = x_history[:,end]
-cd(dirname(@__FILE__)) #change location to current directory
-directory = pwd()
-well_dict = read_sched_file("base.SCHED", directory)
-wells_name =  [i for i in keys(well_dict)]
-for i_well in keys(well_dict)
-	i_well_index = findfirst((x -> x==i_well), wells_name)
-	i,j = get_coordinate(convert(Int, round(x_optimal[i_well_index], digits=0)))
-	well_dict[i_well][1:2] = [i,j] #change only the x and y positions on this test case
+σ_vetor = [500]#[1, 5, 10, 50, 100, 500]
+for i_σ in 1:length(σ_vetor)
+    σ = σ_vetor[i_σ]
+    cd(dirname(@__FILE__)) #change location to current directory
+    (x_history, ys_history) = optimize(constraints, 100, σ)
+    save("resultsDIST20_filter_sigma$σ.jld", "x_history", x_history, "ys_history", ys_history)
+
 end
-
-println(well_dict)
-
-file_directory = directory * "\\" * "AA222_EclipseFile"
-write_sched_file("base.sched", well_dict, file_directory)
-
-cd(directory)
-mycommand = `python FEVAL.py`
-run(mycommand)
-
-			
-aux = open(f->read(f, String), directory * "\\AA222_EclipseFile\\NPV.txt")
-NPV_optimal = parse(Float64, aux)
-=#
